@@ -97,3 +97,11 @@ SET SQL_SAFE_UPDATES = 0;
 UPDATE enquiries SET bill_date = '2026-05-01' WHERE id IN (2,3,6,7,10,13,18,19);
 SET SQL_SAFE_UPDATES = 1;
 SELECT id, companyName, remarks FROM enquiries WHERE companyName LIKE '%Zenith%';
+
+SELECT id, companyName, nameOfFranchisee, franchiseeName FROM enquiries WHERE id = 1;
+SELECT nameOfFranchisee, franchiseeName FROM enquiries WHERE id = 1;
+
+DESCRIBE enquiries;
+
+UPDATE enquiries SET nameOfFranchisee = 'TEST123' WHERE id = 1;
+SELECT nameOfFranchisee FROM enquiries WHERE id = 1;
