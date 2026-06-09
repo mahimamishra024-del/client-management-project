@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Environment variables — never commit these
+.env
+
+# Google OAuth tokens — sensitive credentials
+config/token.json
+config/credentials.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Nodemon
+nodemon.json
