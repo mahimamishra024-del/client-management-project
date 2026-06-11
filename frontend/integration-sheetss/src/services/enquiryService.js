@@ -1,9 +1,31 @@
-import axios from "axios"
+import axios from "axios";
 
-const API = `${import.meta.env.VITE_BACKEND_URL || "http://localhost:5000"}/api/enquiries`
+const API = "http://localhost:5000";
 
-export const getEnquiries  = ()         => axios.get(API)
-export const createEnquiry = (data)     => axios.post(API, data)
-export const updateEnquiry = (id, data) => axios.put(`${API}/${id}`, data)
-export const deleteEnquiry = (id)       => axios.delete(`${API}/${id}`)
-export const getSheetUrl   = ()         => axios.get(`${API}/sheet-url`)
+export const getEnquiries = () => {
+  return axios.get(`${API}/api/enquiries`);
+};
+
+export const createEnquiry = (data) => {
+  return axios.post(`${API}/api/enquiries`, data, {
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+};
+
+export const updateEnquiry = (id, data) => {
+  return axios.put(`${API}/api/enquiries/${id}`, data, {
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+};
+
+export const deleteEnquiry = (id) => {
+  return axios.delete(`${API}/api/enquiries/${id}`);
+};
+
+export const exportExcel = () => {
+  return axios.get(`${API}/api/enquiries/export/excel`);
+};
