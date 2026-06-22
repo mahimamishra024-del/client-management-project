@@ -16,6 +16,8 @@ export const getAuthUrl = () => {
     scope: [
       "https://www.googleapis.com/auth/spreadsheets",
       "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/userinfo.email", // ✅ needed to check email
+      "https://www.googleapis.com/auth/userinfo.profile",
     ],
   });
 };

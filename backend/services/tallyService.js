@@ -1,5 +1,4 @@
 import axios from "axios";
-import xml2js from "xml2js";
 import db from "../config/db.js";
 
 const TALLY_URL = "http://localhost:9999";
@@ -17,8 +16,6 @@ export const testTallyConnection = async () => {
   }
 };
 
-
-// ── CREATE LEDGER IN TALLY ───────────────────────────────────────────────────
 export const createLedgerInTally = async (companyName) => {
   const xml = `
     <ENVELOPE>
@@ -49,14 +46,8 @@ export const createLedgerInTally = async (companyName) => {
       timeout: 5000,
     });
     const raw = response.data || "";
-    const created = raw.includes("<CREATED>1</CREATED>") || raw.includes("Created");
-    const alreadyExists = raw.includes("already exists") || raw.includes("ALTERED");
-    if (created || alreadyExists) {
-      console.log(`✅ Ledger ready: ${companyName}`);
-      return { success: true };
-    }
-    console.warn(`⚠️ Ledger creation uncertain for ${companyName}:`, raw.substring(0, 200));
-    return { success: true }; // proceed anyway
+    console.log(`📋 Ledger response for ${companyName}:`, raw.substring(0, 150));
+    return { success: true };
   } catch (err) {
     console.error(`❌ Ledger creation failed for ${companyName}:`, err.message);
     return { success: false, error: err.message };
@@ -68,15 +59,20 @@ export const buildVoucherXML = (voucherData) => {
   const gstAmount = Math.round(baseAmount * 0.18);
   const totalAmount = baseAmount + gstAmount;
 
-  const formatDate = (d) => {
+ const formatDate = (d) => {
     if (!d) return "";
+    // Handle both "2026-05-23" and full date strings
+    const str = String(d).split("T")[0]; // "2026-05-23"
+    const parts = str.split("-");
+    if (parts.length === 3) {
+      return `${parts[0]}${parts[1]}${parts[2]}`; // "20260523"
+    }
     const dt = new Date(d);
     const y = dt.getFullYear();
     const m = String(dt.getMonth() + 1).padStart(2, "0");
     const day = String(dt.getDate()).padStart(2, "0");
     return `${y}${m}${day}`;
   };
-
   return `<ENVELOPE>
   <HEADER>
     <TALLYREQUEST>Import Data</TALLYREQUEST>
@@ -122,7 +118,6 @@ export const buildVoucherXML = (voucherData) => {
 };
 
 export const createSalesLedgers = async () => {
-  // Sales ledger
   const salesXml = `
     <ENVELOPE>
       <HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER>
@@ -150,41 +145,40 @@ export const createSalesLedgers = async () => {
     </ENVELOPE>`;
   try {
     await axios.post(TALLY_URL, salesXml, { headers: { "Content-Type": "text/xml" }, timeout: 5000 });
-    console.log("✅ Sales and Output GST ledgers created");
+    console.log("✅ Sales and Output GST ledgers ready");
   } catch (err) {
     console.warn("⚠️ Sales ledger creation:", err.message);
   }
 };
 
 export const pushToTally = async (voucherData) => {
-  // Auto-create all required ledgers first
-  await createSalesLedgers();
-  await createLedgerInTally(voucherData.companyName || "Client");
-
-  const xmlPayload = buildVoucherXML(voucherData);
   try {
+    await createSalesLedgers();
+    await createLedgerInTally(voucherData.companyName || "Client");
+
+    const xmlPayload = buildVoucherXML(voucherData);
     const response = await axios.post(TALLY_URL, xmlPayload, {
       headers: { "Content-Type": "text/xml" },
       timeout: 5000,
     });
 
     const raw = response.data || "";
+    console.log("📨 Tally voucher response:", raw.substring(0, 300));
 
-    // ── FIX: old check used .includes("CREATED") || .includes("SUCCESS") which
-    // never matched Tally's actual XML response format <CREATED>1</CREATED>.
-    // Now we check both the tag and the plain-text fallback Tally sometimes sends.
-    const success =
-      raw.includes("<CREATED>1</CREATED>") ||
-      raw.includes("Created") ||
-      raw.toLowerCase().includes("voucher created");
+    // If no LINEERROR — treat as success
+    const hasLineError = raw.includes("<LINEERROR>");
+    if (!hasLineError) {
+      console.log(`✅ Tally push success for: ${voucherData.companyName}`);
+      return { success: true };
+    }
 
-    if (success) return { success: true };
-
-    // Extract Tally's error message if present
     const errorMatch = raw.match(/<LINEERROR>([\s\S]*?)<\/LINEERROR>/i);
     const errorMsg = errorMatch ? errorMatch[1].trim() : "Tally rejected the voucher";
+    console.warn(`❌ Tally push failed for ${voucherData.companyName}: ${errorMsg}`);
     return { success: false, error: errorMsg, raw };
+
   } catch (err) {
+    console.error("❌ Tally push error:", err.message);
     return { success: false, error: err.message };
   }
 };
@@ -217,7 +211,6 @@ export const fetchVouchersFromTally = async () => {
 
     if (!response.data) return [];
 
-    const vouchers = [];
     const voucherRegex = /<VOUCHER[\s\S]*?<\/VOUCHER>/gi;
     const rawVoucherBlocks = response.data.match(voucherRegex);
 
@@ -227,6 +220,7 @@ export const fetchVouchersFromTally = async () => {
     }
 
     console.log(`📊 Matched ${rawVoucherBlocks.length} voucher blocks.`);
+    const vouchers = [];
 
     for (const block of rawVoucherBlocks) {
       const vTypeMatch = block.match(/<(?:VOUCHERTYPENAME|VCHTYPE)>([\s\S]*?)<\/(?:VOUCHERTYPENAME|VCHTYPE)>/i);
@@ -239,16 +233,14 @@ export const fetchVouchersFromTally = async () => {
       const narrationMatch = block.match(/<NARRATION>([\s\S]*?)<\/NARRATION>/i);
       const narration = String(narrationMatch ? narrationMatch[1] : "").trim();
 
-      // Extract company name from PARTYLEDGERNAME
       const partyMatch = block.match(/<PARTYLEDGERNAME>([\s\S]*?)<\/PARTYLEDGERNAME>/i);
       const companyName = String(partyMatch ? partyMatch[1] : "").trim();
 
-      // Extract amount — try ALLLEDGERENTRIES.LIST first, then LEDGERENTRIESLIST
       let amount = 0;
       let maxAmt = 0;
       const allLedgerRegex = /<ALLLEDGERENTRIES\.LIST>([\s\S]*?)<\/ALLLEDGERENTRIES\.LIST>/gi;
       const ledgerRegex = /<LEDGERENTRIESLIST>([\s\S]*?)<\/LEDGERENTRIESLIST>/gi;
-      
+
       const processLedger = (ledgerContent) => {
         const amtMatch = ledgerContent.match(/<AMOUNT>([\s\S]*?)<\/AMOUNT>/i);
         const positiveMatch = ledgerContent.match(/<ISDEEMEDPOSITIVE>([\s\S]*?)<\/ISDEEMEDPOSITIVE>/i);
@@ -286,7 +278,7 @@ export const pushAllClosedToTally = async (rows = null) => {
     let data = rows;
     if (!data) {
       const [fetchedRows] = await db.query(
-        "SELECT * FROM enquiries WHERE (enquiryStatus = 'closed' OR enquiryStatus = 'invoiced') AND tally_pushed = 0"
+        "SELECT * FROM clients WHERE (billingStatus = 'closed' OR billingStatus = 'invoiced') AND tally_pushed = 0"
       );
       data = fetchedRows;
     }
@@ -302,7 +294,7 @@ export const pushAllClosedToTally = async (rows = null) => {
       if (!row.bill_amount) { failedCount++; continue; }
       const result = await pushToTally(row);
       if (result.success) {
-        await db.query("UPDATE enquiries SET tally_pushed = 1 WHERE id = ?", [row.id]);
+        await db.query("UPDATE clients SET tally_pushed = 1 WHERE id = ?", [row.id]);
         successCount++;
       } else {
         failedCount++;

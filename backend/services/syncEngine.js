@@ -34,7 +34,7 @@ export const runSheetSync = async () => {
 
   isSyncingSheet = true;
   try {
-    const [dbRows] = await db.query("SELECT * FROM enquiries ORDER BY id ASC");
+    const [dbRows] = await db.query("SELECT * FROM clients ORDER BY id ASC");
     const currentHash = hashRows(dbRows);
     if (currentHash === lastSyncedHash) {
       console.log("⏭️  Sheet sync skipped — no data change.");
@@ -70,7 +70,7 @@ export const runTallySync = async () => {
       // Try company name match first
       if (voucher.companyName) {
         const [rows] = await db.query(
-          "SELECT id, bill_amount, remarks FROM enquiries WHERE LOWER(companyName) = LOWER(?)",
+          "SELECT id, bill_amount, remarks FROM clients WHERE LOWER(companyName) = LOWER(?)",
           [voucher.companyName]
         );
         if (rows && rows.length > 0) match = rows;
@@ -79,7 +79,7 @@ export const runTallySync = async () => {
       // Fallback to bill_no match
       if (!match && voucher.billNo) {
         const [rows] = await db.query(
-          "SELECT id, bill_amount, remarks FROM enquiries WHERE bill_no = ?",
+          "SELECT id, bill_amount, remarks FROM clients WHERE bill_no = ?",
           [voucher.billNo]
         );
         if (rows && rows.length > 0) match = rows;
@@ -94,7 +94,7 @@ export const runTallySync = async () => {
 
       if (currentRemarks !== incomingRemarks || currentAmt !== incomingAmt) {
         await db.query(
-          "UPDATE enquiries SET remarks = ?, bill_amount = ? WHERE id = ?",
+          "UPDATE clients SET remarks = ?, bill_amount = ? WHERE id = ?",
           [incomingRemarks, incomingAmt, match[0].id]
         );
         console.log(`\x1b[36m🔄 Tally reverse sync: ${voucher.companyName} -> remarks: "${incomingRemarks}", amount: ${incomingAmt}\x1b[0m`);
@@ -102,12 +102,10 @@ export const runTallySync = async () => {
       }
     }
 
+    // Sheet force-sync after Tally changes is skipped for now —
+    // Google Sheets integration is still paused.
     if (anyChanged) {
-      // Force sheet sync — bypass hash check
-      const [freshRows] = await db.query("SELECT * FROM enquiries ORDER BY id ASC");
-      await syncDatabaseToSheet(freshRows, global.currentActiveSheetId);
-      lastSyncedHash = hashRows(freshRows);
-      console.log("[32m✨ Sheet force-synced after Tally reverse sync.[0m");
+      console.log("✅ Tally reverse sync applied changes to clients table.");
     }
   } catch (err) {
     console.warn("⚠️ Tally unreachable (non-fatal):", err.message);
@@ -119,7 +117,7 @@ export const runTallySync = async () => {
 export const scheduleSyncAfterChange = () => {
   console.log("📌 Sync scheduled after change. SheetId:", global.currentActiveSheetId);
   lastSyncedHash = null;
-  isSyncingSheet = false; // Force reset so next sync runs even if previous was stuck
+  isSyncingSheet = false;
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
     debounceTimer = null;
@@ -185,25 +183,27 @@ export const syncSheetToDatabase = async () => {
       const sheetData = {};
       FIELD_ORDER.forEach((field, i) => { sheetData[field] = row[i] !== undefined ? row[i] : null; });
 
-      const [dbRows] = await db.query("SELECT * FROM enquiries WHERE id = ?", [id]);
+      const [dbRows] = await db.query("SELECT * FROM clients WHERE id = ?", [id]);
       if (!dbRows || dbRows.length === 0) continue;
 
       const dbRow = dbRows[0];
 
+      // NOTE: this field list is from the old "enquiry" version and will need
+      // to be rebuilt to match the clients table columns when we do Google
+      // Sheets integration properly. Left as-is since sheet sync is paused.
       const updatableFields = [
-        "companyName", "enquiryStatus", "remarks", "bill_date", "bill_amount",
-        "bdMemberName", "teamLeaderName", "franchiseeName", "hrExecutiveName", "designation",
-        "gstNo", "addressLine1", "emailId", "mobileNo", "website", "placementFees",
-        "positionName", "from", "to", "creditPeriod", "replacementPeriod",
-        "dateOfAllocation", "dateOfReallocation", "newTeamLeader", "nameOfFranchisee",
-        "candidateName", "additionalContacts"
+        "companyName", "billingStatus", "remarks", "bill_date", "bill_amount",
+        "bdMemberName", "teamLeader", "franchiseeName", "designation",
+        "gstNo", "address", "emailId", "phoneNumber", "website", "placementFees",
+        "creditPeriod", "replacementPeriod",
+        "dateOfClientAllocation", "reallocationStatus"
       ];
 
       const normalize = (field, v) => {
         if (v === null || v === undefined || v === "") return "";
         if (v instanceof Date) return v.toISOString().split("T")[0];
         if (typeof v === "string" && v.includes("T") && v.endsWith("Z")) return v.split("T")[0];
-        if (["bill_amount", "placementFees", "from", "to", "creditPeriod", "replacementPeriod"].includes(field)) {
+        if (["bill_amount", "placementFees", "creditPeriod", "replacementPeriod"].includes(field)) {
           const n = parseFloat(v);
           return isNaN(n) ? "" : String(n);
         }
@@ -225,7 +225,7 @@ export const syncSheetToDatabase = async () => {
       if (hasChanges) {
         const setClauses = Object.keys(updates).map(f => `\`${f}\` = ?`).join(", ");
         const values = [...Object.values(updates), id];
-        await db.query(`UPDATE enquiries SET ${setClauses} WHERE id = ?`, values);
+        await db.query(`UPDATE clients SET ${setClauses} WHERE id = ?`, values);
         console.log(`\x1b[35m📥 Sheet→DB updated row id=${id}\x1b[0m`);
         updatedCount++;
       }

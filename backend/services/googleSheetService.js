@@ -1,39 +1,56 @@
 import { google } from "googleapis";
 import { getGoogleClient } from "./googleAuthService.js";
 
-export const SHEET_NAME = "Enquiries";
+export const SHEET_NAME = "Clients";
 
-// ── ALL DB columns in order ──
+// ── ALL clients table columns in order ──
 export const FIELD_ORDER = [
   "id",
   "companyName",
-  "enquiryStatus",
-  "remarks",
-  "bill_no",
-  "bill_date",
-  "bill_amount",
   "bdMemberName",
-  "teamLeaderName",
-  "franchiseeName",
-  "hrExecutiveName",
-  "designation",
+  "dateClientAcquired",
+  "address",
+  "city",
+  "pinCode",
+  "locationArea",
+  "state",
+  "country",
+  "yearOfEstablishment",
+  "industry",
+  "subIndustry",
+  "tags",
+  "companyConstitution",
+  "numberOfEmployees",
   "gstNo",
-  "addressLine1",
-  "emailId",
-  "mobileNo",
   "website",
+  "contactPersonName",
+  "designation",
+  "phoneNumber",
+  "emailId",
+  "contactPersonStatus",
   "placementFees",
-  "positionName",
-  "from",
-  "to",
+  "additionalPlacementFees",
   "creditPeriod",
   "replacementPeriod",
-  "dateOfAllocation",
-  "dateOfReallocation",
-  "newTeamLeader",
-  "nameOfFranchisee",
-  "candidateName",
-  "additionalContacts",
+  "companyCategory",
+  "companyStatus",
+  "approvalStatus",
+  "remarks",
+  "dateOfRevivalCall",
+  "nameOfExecutive",
+  "statusOfCall",
+  "eMeet",
+  "updated",
+  "dateOfDataUpdate",
+  "dataUpdatedBy",
+  "teamLeader",
+  "franchiseeName",
+  "dateOfClientAllocation",
+  "reallocationStatus",
+  "billingStatus",
+  "bill_no",
+  "bill_amount",
+  "bill_date",
   "tally_pushed",
   "created_at",
   "updated_at",
@@ -43,39 +60,56 @@ export const FIELD_ORDER = [
 const HEADERS = [
   "ID",
   "Company Name",
-  "Enquiry Status",
+  "BD Member Name",
+  "Date Client Acquired",
+  "Address",
+  "City",
+  "Pin Code",
+  "Location/Area",
+  "State",
+  "Country",
+  "Year Of Establishment",
+  "Industry",
+  "Sub Industry",
+  "Tags",
+  "Company Constitution",
+  "Number Of Employees",
+  "GST No",
+  "Website",
+  "Contact Person Name",
+  "Designation",
+  "Phone Number",
+  "Email ID",
+  "Contact Person Status",
+  "Placement Fees",
+  "Additional Placement Fees",
+  "Credit Period",
+  "Replacement Period",
+  "Company Category",
+  "Company Status",
+  "Approval Status",
   "Remarks",
+  "Date Of Revival Call",
+  "Name Of Executive",
+  "Status Of Call",
+  "E-Meet",
+  "Updated",
+  "Date Of Data Update",
+  "Data Updated By",
+  "Team Leader",
+  "Franchisee Name",
+  "Date Of Client Allocation",
+  "Reallocation Status",
+  "Billing Status",
   "Bill No",
   "Bill Date",
   "Bill Amount",
-  "BD Member Name",
-  "Team Leader Name",
-  "Franchisee Name",
-  "HR Executive Name",
-  "Designation",
-  "GST No",
-  "Address",
-  "Email ID",
-  "Mobile No",
-  "Website",
-  "Placement Fees",
-  "Position Name",
-  "Salary From",
-  "Salary To",
-  "Credit Period",
-  "Replacement Period",
-  "Date of Allocation",
-  "Date of Reallocation",
-  "New Team Leader",
-  "Name of Franchisee",
-  "Candidate Name",
-  "Additional Contacts",
   "Tally Pushed",
   "Created At",
   "Updated At",
 ];
 
-const COL_COUNT = FIELD_ORDER.length; // 32 columns
+const COL_COUNT = FIELD_ORDER.length;
 
 // Convert column index (0-based) to A1 letter e.g. 0=A, 25=Z, 26=AA
 const colLetter = (n) => {
@@ -89,7 +123,7 @@ const colLetter = (n) => {
   return s;
 };
 
-const LAST_COL = colLetter(COL_COUNT - 1); // e.g. "AF"
+const LAST_COL = colLetter(COL_COUNT - 1);
 
 const formatValue = (field, value) => {
   if (value === undefined || value === null) return "";
@@ -123,7 +157,6 @@ export const createGoogleSheet = async (title = "Saarthi360 Synced Sheet") => {
       console.warn("⚠️ Permission set failed (non-fatal):", e.message);
     }
 
-    // Rename tab + write headers
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId: newSheetId,
       requestBody: {
@@ -175,7 +208,6 @@ export const syncDatabaseToSheet = async (dbRows, dynamicSheetId) => {
       FIELD_ORDER.map((field) => formatValue(field, row[field]))
     );
 
-    // Single batchUpdate — data rows + 500 blank rows to clear ghost data
     await sheets.spreadsheets.values.batchUpdate({
       spreadsheetId: targetSheetId,
       requestBody: {

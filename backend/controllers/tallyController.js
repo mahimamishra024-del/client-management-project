@@ -5,7 +5,7 @@ import {
   buildVoucherXML,
   fetchVouchersFromTally,
 } from "../services/tallyService.js";
-import { runSheetSync, runTallySync } from "../services/syncEngine.js";
+import { runTallySync } from "../services/syncEngine.js";
 
 export const tallyStatus = async (req, res) => {
   try {
@@ -16,29 +16,28 @@ export const tallyStatus = async (req, res) => {
   }
 };
 
-export const pushEnquiryToTally = async (req, res) => {
+export const pushClientToTally = async (req, res) => {
   const { id } = req.params;
   try {
-    const [rows] = await db.query("SELECT * FROM enquiries WHERE id = ?", [id]);
+    const [rows] = await db.query("SELECT * FROM clients WHERE id = ?", [id]);
     if (!rows.length) return res.status(404).json({ error: "Not found" });
 
-    const enquiry = rows[0];
+    const client = rows[0];
 
-    if (!["closed", "invoiced"].includes(enquiry.enquiryStatus)) {
-      return res.status(400).json({ error: "Status must be 'closed' or 'invoiced'" });
+    if (!["closed", "invoiced"].includes(client.billingStatus)) {
+      return res.status(400).json({ error: "Billing status must be 'closed' or 'invoiced'" });
     }
-    if (!enquiry.bill_amount) {
+    if (!client.bill_amount) {
       return res.status(400).json({ error: "Bill amount missing" });
     }
-    if (!enquiry.bill_date) {
+    if (!client.bill_date) {
       return res.status(400).json({ error: "Bill date missing" });
     }
 
-    const result = await pushToTally(enquiry);
+    const result = await pushToTally(client);
     if (result.success) {
-      await db.query("UPDATE enquiries SET tally_pushed = 1 WHERE id = ?", [id]);
-      await runSheetSync();
-      return res.json({ success: true, message: `Enquiry ${id} pushed successfully` });
+      await db.query("UPDATE clients SET tally_pushed = 1 WHERE id = ?", [id]);
+      return res.json({ success: true, message: `Client ${id} pushed successfully` });
     }
 
     res.status(500).json(result);
@@ -48,13 +47,11 @@ export const pushEnquiryToTally = async (req, res) => {
 };
 
 // ── PUSH ALL ─────────────────────────────────────────────────────────────────
-// Pushes ALL closed/invoiced rows with bill_amount and bill_date filled
-// Reports exactly which succeeded and which failed with reasons
 export const pushAllToTally = async (req, res) => {
   try {
     const [rows] = await db.query(
-      `SELECT * FROM enquiries 
-       WHERE (enquiryStatus='closed' OR enquiryStatus='invoiced') 
+      `SELECT * FROM clients 
+       WHERE (billingStatus='closed' OR billingStatus='invoiced') 
        AND tally_pushed = 0
        AND bill_amount IS NOT NULL AND bill_amount > 0
        AND bill_date IS NOT NULL`
@@ -64,7 +61,7 @@ export const pushAllToTally = async (req, res) => {
       return res.json({ success: true, message: "No eligible un-pushed items", pushed: 0, failed: 0 });
     }
 
-    console.log(`🚀 Pushing ${rows.length} enquiries to Tally...`);
+    console.log(`🚀 Pushing ${rows.length} clients to Tally...`);
 
     let pushed = 0;
     let failed = 0;
@@ -74,7 +71,7 @@ export const pushAllToTally = async (req, res) => {
       try {
         const result = await pushToTally(row);
         if (result.success) {
-          await db.query("UPDATE enquiries SET tally_pushed = 1 WHERE id = ?", [row.id]);
+          await db.query("UPDATE clients SET tally_pushed = 1 WHERE id = ?", [row.id]);
           console.log(`✅ Pushed: ${row.companyName} (${row.bill_no})`);
           pushed++;
         } else {
@@ -89,7 +86,6 @@ export const pushAllToTally = async (req, res) => {
       }
     }
 
-    await runSheetSync();
     res.json({ success: true, pushed, failed, failedList });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -99,7 +95,7 @@ export const pushAllToTally = async (req, res) => {
 export const getTallyPushed = async (req, res) => {
   try {
     const [rows] = await db.query(
-      "SELECT id, bill_no, companyName FROM enquiries WHERE tally_pushed = 1"
+      "SELECT id, bill_no, companyName FROM clients WHERE tally_pushed = 1"
     );
     res.json(rows);
   } catch (err) {
@@ -110,7 +106,7 @@ export const getTallyPushed = async (req, res) => {
 export const previewXML = async (req, res) => {
   const { id } = req.params;
   try {
-    const [rows] = await db.query("SELECT * FROM enquiries WHERE id = ?", [id]);
+    const [rows] = await db.query("SELECT * FROM clients WHERE id = ?", [id]);
     if (!rows.length) return res.status(404).json({ error: "Not found" });
     const xml = buildVoucherXML(rows[0]);
     res.setHeader("Content-Type", "text/xml");
@@ -132,7 +128,6 @@ export const syncFromTally = async (req, res) => {
 export const triggerReverseSync = async (req, res) => {
   try {
     await runTallySync();
-    await runSheetSync();
     res.json({ success: true, message: "Reverse sync triggered." });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

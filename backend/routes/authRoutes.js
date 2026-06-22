@@ -1,5 +1,11 @@
 import express from "express";
-import { googleAuth, googleCallback, googleStatus, googleDisconnect } from "../controllers/authController.js";
+import {
+  googleAuth,
+  googleCallback,
+  googleStatus,
+  googleDisconnect,
+  checkEmailAccess,
+} from "../controllers/authController.js";
 
 const router = express.Router();
 
@@ -14,5 +20,8 @@ router.get("/google/status", googleStatus);
 
 // 👉 http://localhost:5000/auth/google/disconnect
 router.get("/google/disconnect", googleDisconnect);
+
+// 👉 http://localhost:5000/auth/check-access  (POST)
+router.post("/check-access", checkEmailAccess);
 
 export default router;
