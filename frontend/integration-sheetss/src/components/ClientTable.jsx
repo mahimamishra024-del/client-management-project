@@ -107,14 +107,14 @@ export default function ClientTable({ clients, refreshData, onAddClick }) {
 
       {/* ── Table ── */}
       <div style={{ overflowX: "auto", borderRadius: 10, border: "1px solid #E5E7EB" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1300 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1600 }}>
           <thead>
             <tr style={{ background: "#F9FAFB" }}>
               {[
                 "TIMESTAMP", "COMPANY NAME", "BD MEMBER", "CONTACT PERSON",
                 "PHONE", "EMAIL", "CITY", "INDUSTRY",
                 "COMPANY STATUS", "APPROVAL STATUS", "TEAM LEADER",
-                "FRANCHISEE", "DATE OF ALLOCATION", "ACTION"
+                "FRANCHISEE", "DATE OF ALLOCATION", "BILLING STATUS", "BILL NO", "BILL AMOUNT", "ACTION"
               ].map(h => (
                 <th key={h} style={{ padding: "11px 14px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#4B5563", borderBottom: "1px solid #E5E7EB", whiteSpace: "nowrap", letterSpacing: "0.04em" }}>
                   {h}
@@ -124,7 +124,7 @@ export default function ClientTable({ clients, refreshData, onAddClick }) {
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={14} style={{ padding: 40, textAlign: "center", color: "#9CA3AF", fontSize: 14 }}>No matching records</td></tr>
+              <tr><td colSpan={17} style={{ padding: 40, textAlign: "center", color: "#9CA3AF", fontSize: 14 }}>No matching records</td></tr>
             ) : (
               filtered.map(item => <ClientRow key={item.id} item={item} refreshData={refreshData} />)
             )}

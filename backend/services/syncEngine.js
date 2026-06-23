@@ -67,7 +67,6 @@ export const runTallySync = async () => {
 
       let match = null;
 
-      // Try company name match first
       if (voucher.companyName) {
         const [rows] = await db.query(
           "SELECT id, bill_amount, remarks FROM clients WHERE LOWER(companyName) = LOWER(?)",
@@ -76,7 +75,6 @@ export const runTallySync = async () => {
         if (rows && rows.length > 0) match = rows;
       }
 
-      // Fallback to bill_no match
       if (!match && voucher.billNo) {
         const [rows] = await db.query(
           "SELECT id, bill_amount, remarks FROM clients WHERE bill_no = ?",
@@ -102,8 +100,6 @@ export const runTallySync = async () => {
       }
     }
 
-    // Sheet force-sync after Tally changes is skipped for now —
-    // Google Sheets integration is still paused.
     if (anyChanged) {
       console.log("✅ Tally reverse sync applied changes to clients table.");
     }
@@ -188,11 +184,13 @@ export const syncSheetToDatabase = async () => {
 
       const dbRow = dbRows[0];
 
-      // NOTE: this field list is from the old "enquiry" version and will need
-      // to be rebuilt to match the clients table columns when we do Google
-      // Sheets integration properly. Left as-is since sheet sync is paused.
+      // Billing fields (billingStatus, bill_no, bill_amount, bill_date, tally_pushed)
+      // are intentionally EXCLUDED here. They are controlled only by the app's
+      // own form + Tally push logic, never overwritten by sheet content — this
+      // prevents the sheet's lag (a few seconds behind after a save) from
+      // silently wiping out billing data that was just entered.
       const updatableFields = [
-        "companyName", "billingStatus", "remarks", "bill_date", "bill_amount",
+        "companyName", "remarks",
         "bdMemberName", "teamLeader", "franchiseeName", "designation",
         "gstNo", "address", "emailId", "phoneNumber", "website", "placementFees",
         "creditPeriod", "replacementPeriod",
@@ -203,7 +201,7 @@ export const syncSheetToDatabase = async () => {
         if (v === null || v === undefined || v === "") return "";
         if (v instanceof Date) return v.toISOString().split("T")[0];
         if (typeof v === "string" && v.includes("T") && v.endsWith("Z")) return v.split("T")[0];
-        if (["bill_amount", "placementFees", "creditPeriod", "replacementPeriod"].includes(field)) {
+        if (["placementFees", "creditPeriod", "replacementPeriod"].includes(field)) {
           const n = parseFloat(v);
           return isNaN(n) ? "" : String(n);
         }

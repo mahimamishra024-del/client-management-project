@@ -13,6 +13,7 @@ export default function Dashboard() {
   const [sheetMsg, setSheetMsg]               = useState("")
   const [googleConnected, setGoogleConnected] = useState(false)
   const [sheetUrl, setSheetUrl]               = useState(null)
+  const [downloadUrl, setDownloadUrl]         = useState(null)
 
   const load = async () => {
     try {
@@ -32,26 +33,29 @@ export default function Dashboard() {
       if (connected && currentSheetId) {
         setGoogleConnected(true)
         setSheetUrl(`https://docs.google.com/spreadsheets/d/${currentSheetId}/edit`)
+        setDownloadUrl(`https://docs.google.com/spreadsheets/d/${currentSheetId}/export?format=csv`)
       } else {
         setGoogleConnected(false)
         setSheetUrl(null)
+        setDownloadUrl(null)
       }
     } catch {
       setGoogleConnected(false)
       setSheetUrl(null)
+      setDownloadUrl(null)
     }
   }
 
   useEffect(() => {
     load()
 
-    // ✅ First check URL params BEFORE checking google status
     const params = new URLSearchParams(window.location.search)
 
     if (params.get("google") === "connected") {
       const sid = params.get("sheetId")
       if (sid) {
         setSheetUrl(`https://docs.google.com/spreadsheets/d/${sid}/edit`)
+        setDownloadUrl(`https://docs.google.com/spreadsheets/d/${sid}/export?format=csv`)
         setGoogleConnected(true)
       }
       setSheetMsg("✅ Google Sheet created and live sync started!")
@@ -61,17 +65,18 @@ export default function Dashboard() {
       const deniedEmail = params.get("email") || "your account"
       setGoogleConnected(false)
       setSheetUrl(null)
+      setDownloadUrl(null)
       setSheetMsg(`🚫 Access denied for ${decodeURIComponent(deniedEmail)}. You are not authorized to connect Google Sheets.`)
       setTimeout(() => setSheetMsg(""), 8000)
       window.history.replaceState({}, "", window.location.pathname)
     } else if (params.get("google") === "error") {
       setGoogleConnected(false)
       setSheetUrl(null)
+      setDownloadUrl(null)
       setSheetMsg("❌ Google auth failed. Please try connecting again.")
       setTimeout(() => setSheetMsg(""), 6000)
       window.history.replaceState({}, "", window.location.pathname)
     } else {
-      // No URL params — check actual status from backend
       checkGoogleStatus()
     }
 
@@ -119,22 +124,30 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <button onClick={handleSheetClick} style={googleConnected && sheetUrl ? greenBtn : connectBtn}>
-          {googleConnected && sheetUrl ? (
-            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <rect width="24" height="24" rx="3" fill="white" fillOpacity="0.2"/>
-                <rect x="6" y="7" width="5" height="2" rx="0.5" fill="white"/>
-                <rect x="13" y="7" width="5" height="2" rx="0.5" fill="white"/>
-                <rect x="6" y="11" width="5" height="2" rx="0.5" fill="white"/>
-                <rect x="13" y="11" width="5" height="2" rx="0.5" fill="white"/>
-                <rect x="6" y="15" width="5" height="2" rx="0.5" fill="white"/>
-                <rect x="13" y="15" width="5" height="2" rx="0.5" fill="white"/>
-              </svg>
-              Open Google Sheet
-            </span>
-          ) : "🔗 Connect Google Account"}
-        </button>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={handleSheetClick} style={googleConnected && sheetUrl ? greenBtn : connectBtn}>
+            {googleConnected && sheetUrl ? (
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <rect width="24" height="24" rx="3" fill="white" fillOpacity="0.2"/>
+                  <rect x="6" y="7" width="5" height="2" rx="0.5" fill="white"/>
+                  <rect x="13" y="7" width="5" height="2" rx="0.5" fill="white"/>
+                  <rect x="6" y="11" width="5" height="2" rx="0.5" fill="white"/>
+                  <rect x="13" y="11" width="5" height="2" rx="0.5" fill="white"/>
+                  <rect x="6" y="15" width="5" height="2" rx="0.5" fill="white"/>
+                  <rect x="13" y="15" width="5" height="2" rx="0.5" fill="white"/>
+                </svg>
+                Open Google Sheet
+              </span>
+            ) : "🔗 Connect Google Account"}
+          </button>
+
+          {googleConnected && downloadUrl && (
+            <a href={downloadUrl} style={downloadBtn} download>
+              ⬇ Download Google Sheet
+            </a>
+          )}
+        </div>
       </div>
 
       {/* Banner */}
@@ -186,5 +199,6 @@ export default function Dashboard() {
   )
 }
 
-const greenBtn   = { display: "flex", alignItems: "center", gap: 8, background: "#107c41", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", cursor: "pointer", fontSize: 13, fontWeight: 600 }
-const connectBtn = { background: "#5B21B6", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", cursor: "pointer", fontSize: 13, fontWeight: 600 }
+const greenBtn    = { display: "flex", alignItems: "center", gap: 8, background: "#107c41", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", cursor: "pointer", fontSize: 13, fontWeight: 600 }
+const connectBtn  = { background: "#5B21B6", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", cursor: "pointer", fontSize: 13, fontWeight: 600 }
+const downloadBtn = { display: "flex", alignItems: "center", gap: 6, background: "#fff", color: "#5B21B6", border: "1px solid #5B21B6", borderRadius: 8, padding: "9px 18px", cursor: "pointer", fontSize: 13, fontWeight: 600, textDecoration: "none" }

@@ -33,10 +33,8 @@ export const googleCallback = async (req, res) => {
   }
 
   try {
-    // Step 1: Get tokens from Google
     const tokens = await getTokensFromCode(code);
 
-    // Step 2: Get the email of whoever just logged in
     const oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
@@ -48,19 +46,24 @@ export const googleCallback = async (req, res) => {
     const userEmail = data.email;
     console.log("📧 Google login attempted by:", userEmail);
 
-    // Step 3: Check if this email is in allowed_emails table
+    // ALWAYS clear any previous connection first — every new sign-in attempt starts fresh
+    await db.query("DELETE FROM settings WHERE `key` = 'spreadsheetId'");
+    global.currentActiveSheetId = null;
+    if (fs.existsSync(TOKEN_PATH)) {
+      fs.unlinkSync(TOKEN_PATH);
+      console.log("🗑️ Previous token cleared before processing new sign-in attempt.");
+    }
+
     const [allowed] = await db.query(
       "SELECT id FROM allowed_emails WHERE LOWER(email) = LOWER(?)",
       [userEmail.trim()]
     );
 
     if (!allowed.length) {
-      // ❌ NOT allowed — do NOT save token
       console.warn(`🚫 Access denied for: ${userEmail}`);
       return res.redirect(`${FRONTEND_URL}?google=denied&email=${encodeURIComponent(userEmail)}`);
     }
 
-    // Step 4: ✅ Allowed — save tokens and create sheet
     await saveTokens(tokens);
     console.log("✅ Google tokens saved for:", userEmail);
 
@@ -100,11 +103,12 @@ export const googleStatus = async (req, res) => {
     }
 
     const [rows] = await db.query("SELECT value FROM settings WHERE `key` = 'spreadsheetId'");
-    if (!rows.length) {
+    const sheetId = rows.length ? rows[0].value : null;
+
+    if (!sheetId) {
       return res.json({ connected: false, currentSheetId: null });
     }
 
-    const sheetId = rows[0].value;
     global.currentActiveSheetId = sheetId;
     return res.json({ connected: true, currentSheetId: sheetId });
 

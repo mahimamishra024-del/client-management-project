@@ -54,25 +54,54 @@ export const createLedgerInTally = async (companyName) => {
   }
 };
 
+// Converts any date format to Tally's required YYYYMMDD format
+const formatDateForTally = (d) => {
+  if (!d) return "";
+
+  // If it's already a Date object (MySQL returns these)
+  if (d instanceof Date) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const result = `${y}${m}${day}`;
+    console.log(`🗓️ Date object → ${result}`);
+    return result;
+  }
+
+  // If it's a string like "2026-06-23"
+  if (typeof d === "string") {
+    const clean = d.includes("T") ? d.split("T")[0] : d;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+      const result = clean.replace(/-/g, "");
+      console.log(`🗓️ Date string → ${result}`);
+      return result;
+    }
+  }
+
+  // Fallback
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) {
+    console.log(`🗓️ Date invalid → empty`);
+    return "";
+  }
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, "0");
+  const day = String(dt.getDate()).padStart(2, "0");
+  const result = `${y}${m}${day}`;
+  console.log(`🗓️ Date fallback → ${result}`);
+  return result;
+};
+
 export const buildVoucherXML = (voucherData) => {
+  console.log("🗓️ bill_date raw:", voucherData.bill_date, "| type:", typeof voucherData.bill_date, "| isDate:", voucherData.bill_date instanceof Date);
+
   const baseAmount = parseFloat(voucherData.bill_amount) || 0;
   const gstAmount = Math.round(baseAmount * 0.18);
   const totalAmount = baseAmount + gstAmount;
+  const formattedDate = formatDateForTally(voucherData.bill_date);
 
- const formatDate = (d) => {
-    if (!d) return "";
-    // Handle both "2026-05-23" and full date strings
-    const str = String(d).split("T")[0]; // "2026-05-23"
-    const parts = str.split("-");
-    if (parts.length === 3) {
-      return `${parts[0]}${parts[1]}${parts[2]}`; // "20260523"
-    }
-    const dt = new Date(d);
-    const y = dt.getFullYear();
-    const m = String(dt.getMonth() + 1).padStart(2, "0");
-    const day = String(dt.getDate()).padStart(2, "0");
-    return `${y}${m}${day}`;
-  };
+  console.log("🗓️ Final formatted date for Tally:", formattedDate);
+
   return `<ENVELOPE>
   <HEADER>
     <TALLYREQUEST>Import Data</TALLYREQUEST>
@@ -83,13 +112,13 @@ export const buildVoucherXML = (voucherData) => {
         <REPORTNAME>Vouchers</REPORTNAME>
         <STATICVARIABLES>
           <SVCOMPANYNAME>Saarthi360</SVCOMPANYNAME>
-          <SVCURRENTDATE>${formatDate(voucherData.bill_date)}</SVCURRENTDATE>
+          <SVCURRENTDATE>${formattedDate}</SVCURRENTDATE>
         </STATICVARIABLES>
       </REQUESTDESC>
       <REQUESTDATA>
         <TALLYMESSAGE xmlns:UDF="TallyUDF">
           <VOUCHER VCHTYPE="Sales" ACTION="Create">
-            <DATE>${formatDate(voucherData.bill_date)}</DATE>
+            <DATE>${formattedDate}</DATE>
             <VOUCHERTYPENAME>Sales</VOUCHERTYPENAME>
             <VOUCHERNUMBER>${voucherData.bill_no || ""}</VOUCHERNUMBER>
             <PARTYLEDGERNAME>${voucherData.companyName || "Client Name"}</PARTYLEDGERNAME>
@@ -165,7 +194,6 @@ export const pushToTally = async (voucherData) => {
     const raw = response.data || "";
     console.log("📨 Tally voucher response:", raw.substring(0, 300));
 
-    // If no LINEERROR — treat as success
     const hasLineError = raw.includes("<LINEERROR>");
     if (!hasLineError) {
       console.log(`✅ Tally push success for: ${voucherData.companyName}`);

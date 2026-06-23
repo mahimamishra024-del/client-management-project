@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom"
+import { deleteClient } from "../services/clientService"
 
 const fmtDate = (val) => {
   if (!val) return "—"
@@ -24,11 +25,26 @@ const STATUS_COLORS = {
   Approved:  { bg: "#EFF6FF", color: "#1D4ED8" },
   Pending:   { bg: "#FFF7ED", color: "#C2410C" },
   Rejected:  { bg: "#FFF1F2", color: "#9F1239" },
+  pending:   { bg: "#FFF7ED", color: "#C2410C" },
+  closed:    { bg: "#F0FDF4", color: "#15803D" },
+  invoiced:  { bg: "#EFF6FF", color: "#1D4ED8" },
 }
 
-export default function ClientRow({ item }) {
+export default function ClientRow({ item, refreshData }) {
   const navigate = useNavigate()
   const sm = STATUS_COLORS[item.companyStatus] || { bg: "#F3F4F6", color: "#374151" }
+  const bm = STATUS_COLORS[item.billingStatus] || { bg: "#F3F4F6", color: "#374151" }
+
+  const handleDelete = async (e) => {
+    e.stopPropagation()
+    if (!window.confirm(`Delete ${item.companyName || "this client"}? This cannot be undone.`)) return
+    try {
+      await deleteClient(item.id)
+      refreshData()
+    } catch (err) {
+      alert("Delete failed: " + err.message)
+    }
+  }
 
   return (
     <tr
@@ -56,12 +72,27 @@ export default function ClientRow({ item }) {
       <td style={td}>{item.franchiseeName || "—"}</td>
       <td style={td}>{fmtDate(item.dateOfClientAllocation)}</td>
       <td style={td}>
-        <button
-          onClick={() => navigate(`/edit-client/${item.id}`)}
-          style={{ background: "#F5F3FF", color: "#5B21B6", border: "1px solid #DDD6FE", borderRadius: 6, padding: "4px 14px", cursor: "pointer", fontSize: 12, fontWeight: 500 }}
-        >
-          Edit
-        </button>
+        <span style={{ background: bm.bg, color: bm.color, padding: "3px 10px", borderRadius: 99, fontSize: 11, fontWeight: 500, whiteSpace: "nowrap" }}>
+          {item.billingStatus || "pending"}
+        </span>
+      </td>
+      <td style={td}>{item.bill_no || "—"}</td>
+      <td style={td}>{item.bill_amount ? `₹${Number(item.bill_amount).toLocaleString("en-IN")}` : "—"}</td>
+      <td style={td}>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button
+            onClick={() => navigate(`/edit-client/${item.id}`)}
+            style={{ background: "#F5F3FF", color: "#5B21B6", border: "1px solid #DDD6FE", borderRadius: 6, padding: "4px 14px", cursor: "pointer", fontSize: 12, fontWeight: 500 }}
+          >
+            Edit
+          </button>
+          <button
+            onClick={handleDelete}
+            style={{ background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 6, padding: "4px 14px", cursor: "pointer", fontSize: 12, fontWeight: 500 }}
+          >
+            Delete
+          </button>
+        </div>
       </td>
     </tr>
   )
