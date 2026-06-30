@@ -102,8 +102,8 @@ const HEADERS = [
   "Reallocation Status",
   "Billing Status",
   "Bill No",
-  "Bill Date",
-  "Bill Amount",
+  "Bill Amount",   // ✅ FIXED: was "Bill Date"
+  "Bill Date",     // ✅ FIXED: was "Bill Amount"
   "Tally Pushed",
   "Created At",
   "Updated At",

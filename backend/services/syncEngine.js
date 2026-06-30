@@ -162,7 +162,7 @@ export const syncSheetToDatabase = async () => {
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: global.currentActiveSheetId,
-      range: `${tabName}!A2:AF10000`,
+      range: `${tabName}!A2:BF10000`, // ✅ FIXED: was AF (col 32), now BF (col 58) to cover all 57 fields
     });
 
     const sheetRows = response.data.values || [];
