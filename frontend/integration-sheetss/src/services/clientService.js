@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API = "http://localhost:5000";
+const API = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000"; // ✅ FIXED: was hardcoded
 
 export const getClients = () => {
   return axios.get(`${API}/api/clients`);

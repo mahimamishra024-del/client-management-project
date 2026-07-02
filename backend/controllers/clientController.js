@@ -83,7 +83,7 @@ export const createClient = async (req, res) => {
         dateOfRevivalCall || null, nameOfExecutive, statusOfCall, eMeet || "No",
         updated || "No", dateOfDataUpdate || null, dataUpdatedBy,
         teamLeader, franchiseeName, dateOfClientAllocation || null, reallocationStatus || "No",
-        billingStatus || "pending", bill_no || null, bill_amount || null, bill_date || null
+        billingStatus || "Unbilled", bill_no || null, bill_amount || null, bill_date || null  // ✅ FIXED: "pending" → "Unbilled"
       ]
     );
 
@@ -140,7 +140,7 @@ export const updateClient = async (req, res) => {
         dateOfRevivalCall || null, nameOfExecutive, statusOfCall, eMeet,
         updated, dateOfDataUpdate || null, dataUpdatedBy,
         teamLeader, franchiseeName, dateOfClientAllocation || null, reallocationStatus,
-        billingStatus || "pending", bill_no || null, bill_amount || null, bill_date || null,
+        billingStatus || "Unbilled", bill_no || null, bill_amount || null, bill_date || null,  // ✅ FIXED: "pending" → "Unbilled"
         id
       ]
     );

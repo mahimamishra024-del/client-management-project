@@ -102,8 +102,8 @@ const HEADERS = [
   "Reallocation Status",
   "Billing Status",
   "Bill No",
-  "Bill Amount",   // ✅ FIXED: was "Bill Date"
-  "Bill Date",     // ✅ FIXED: was "Bill Amount"
+  "Bill Amount",
+  "Bill Date",
   "Tally Pushed",
   "Created At",
   "Updated At",
@@ -208,6 +208,8 @@ export const syncDatabaseToSheet = async (dbRows, dynamicSheetId) => {
       FIELD_ORDER.map((field) => formatValue(field, row[field]))
     );
 
+    const clearRowCount = Math.max(0, 9999 - sheetValues.length);
+
     await sheets.spreadsheets.values.batchUpdate({
       spreadsheetId: targetSheetId,
       requestBody: {
@@ -217,10 +219,10 @@ export const syncDatabaseToSheet = async (dbRows, dynamicSheetId) => {
             range: `${tabName}!A2:${LAST_COL}${sheetValues.length + 1}`,
             values: sheetValues,
           }] : []),
-          {
-            range: `${tabName}!A${sheetValues.length + 2}:${LAST_COL}${sheetValues.length + 502}`,
-            values: Array(500).fill(FIELD_ORDER.map(() => "")),
-          },
+          ...(clearRowCount > 0 ? [{
+            range: `${tabName}!A${sheetValues.length + 2}:${LAST_COL}10000`, // ✅ FIXED: clears ALL rows up to 10000
+            values: Array(clearRowCount).fill(FIELD_ORDER.map(() => "")),
+          }] : []),
         ],
       },
     });

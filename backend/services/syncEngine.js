@@ -51,7 +51,6 @@ export const runSheetSync = async () => {
 };
 
 // ── TALLY → DB REVERSE SYNC ──
-// Matches by companyName (primary) since Tally assigns its own voucher numbers
 export const runTallySync = async () => {
   if (isSyncingTally) return;
   isSyncingTally = true;
@@ -126,7 +125,10 @@ export const runSync = runSheetSync;
 export const startSyncLoop = (intervalMs = 60000) => {
   if (!sheetIntervalStarted) {
     sheetIntervalStarted = true;
-    activeSheetInterval = setInterval(runSheetSync, intervalMs);
+    activeSheetInterval = setInterval(async () => {
+      if (!global.currentActiveSheetId) return; // ✅ FIXED: Skip if no sheet ID yet
+      await runSheetSync();
+    }, intervalMs);
     console.log(`✅ Sheet sync loop started at ${intervalMs}ms`);
   }
   if (!tallyIntervalStarted) {
@@ -134,7 +136,10 @@ export const startSyncLoop = (intervalMs = 60000) => {
     activeTallyInterval = setInterval(runTallySync, 30 * 1000);
     console.log(`✅ Tally sync loop started at 30s interval`);
   }
-  setInterval(syncSheetToDatabase, 30 * 1000);
+  setInterval(async () => {
+    if (!global.currentActiveSheetId) return; // ✅ FIXED: Skip if no sheet ID yet
+    await syncSheetToDatabase();
+  }, 30 * 1000);
   console.log(`✅ Sheet→DB sync loop started at 30s interval`);
 };
 
@@ -162,7 +167,7 @@ export const syncSheetToDatabase = async () => {
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: global.currentActiveSheetId,
-      range: `${tabName}!A2:BF10000`, // ✅ FIXED: was AF (col 32), now BF (col 58) to cover all 57 fields
+      range: `${tabName}!A2:BF10000`, // ✅ FIXED: was AF (col 32), now BF (col 58)
     });
 
     const sheetRows = response.data.values || [];
@@ -184,11 +189,6 @@ export const syncSheetToDatabase = async () => {
 
       const dbRow = dbRows[0];
 
-      // Billing fields (billingStatus, bill_no, bill_amount, bill_date, tally_pushed)
-      // are intentionally EXCLUDED here. They are controlled only by the app's
-      // own form + Tally push logic, never overwritten by sheet content — this
-      // prevents the sheet's lag (a few seconds behind after a save) from
-      // silently wiping out billing data that was just entered.
       const updatableFields = [
         "companyName", "remarks",
         "bdMemberName", "teamLeader", "franchiseeName", "designation",
