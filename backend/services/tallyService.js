@@ -60,9 +60,10 @@ const formatDateForTally = (d) => {
 
   // If it's already a Date object (MySQL returns these)
   if (d instanceof Date) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
+    // ✅ FIXED: Use UTC to avoid timezone shift (IST +5:30 was causing date to shift by 1 day)
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
     const result = `${y}${m}${day}`;
     console.log(`🗓️ Date object → ${result}`);
     return result;
@@ -84,9 +85,9 @@ const formatDateForTally = (d) => {
     console.log(`🗓️ Date invalid → empty`);
     return "";
   }
-  const y = dt.getFullYear();
-  const m = String(dt.getMonth() + 1).padStart(2, "0");
-  const day = String(dt.getDate()).padStart(2, "0");
+  const y = dt.getUTCFullYear();
+  const m = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(dt.getUTCDate()).padStart(2, "0");
   const result = `${y}${m}${day}`;
   console.log(`🗓️ Date fallback → ${result}`);
   return result;
@@ -112,6 +113,8 @@ export const buildVoucherXML = (voucherData) => {
         <REPORTNAME>Vouchers</REPORTNAME>
         <STATICVARIABLES>
           <SVCOMPANYNAME>Saarthi360</SVCOMPANYNAME>
+          <SVFROMDATE>${formattedDate}</SVFROMDATE>
+          <SVTODATE>${formattedDate}</SVTODATE>
           <SVCURRENTDATE>${formattedDate}</SVCURRENTDATE>
         </STATICVARIABLES>
       </REQUESTDESC>
@@ -121,6 +124,8 @@ export const buildVoucherXML = (voucherData) => {
             <DATE>${formattedDate}</DATE>
             <VOUCHERTYPENAME>Sales</VOUCHERTYPENAME>
             <VOUCHERNUMBER>${voucherData.bill_no || ""}</VOUCHERNUMBER>
+            <PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW>
+            <ISINVOICE>Yes</ISINVOICE>
             <PARTYLEDGERNAME>${voucherData.companyName || "Client Name"}</PARTYLEDGERNAME>
             <NARRATION>${voucherData.remarks || "Placement Fees"}</NARRATION>
             <ALLLEDGERENTRIES.LIST>

@@ -14,17 +14,34 @@ const autoPushToTallyIfReady = async (clientId) => {
 
     console.log(`🔍 Auto-push check for #${clientId}: billingReady=${billingReady}, notYetPushed=${notYetPushed}, hasRequiredFields=${hasRequiredFields}`);
 
-    if (billingReady && notYetPushed && hasRequiredFields) {
-      console.log(`🚀 Attempting Tally push for client #${clientId} (${client.companyName})...`);
-      const result = await pushToTally(client);
-      if (result.success) {
-        await db.query("UPDATE clients SET tally_pushed = 1 WHERE id = ?", [clientId]);
-        console.log(`✅ Auto-pushed client #${clientId} (${client.companyName}) to Tally`);
-      } else {
-        console.warn(`⚠️ Auto-push failed for client #${clientId}: ${result.error}`);
-      }
-    } else {
+    if (!billingReady || !notYetPushed || !hasRequiredFields) {
       console.log(`⏭️ Auto-push skipped for client #${clientId} — conditions not met`);
+      return;
+    }
+
+    // ✅ FIXED: Check if same bill_no already pushed — stop retrying duplicate vouchers
+    if (client.bill_no) {
+      const [alreadyPushed] = await db.query(
+        "SELECT id FROM clients WHERE bill_no = ? AND tally_pushed = 1 AND id != ?",
+        [client.bill_no, clientId]
+      );
+      if (alreadyPushed.length > 0) {
+        await db.query("UPDATE clients SET tally_pushed = 1 WHERE id = ?", [clientId]);
+        console.log(`⏭️ Bill no ${client.bill_no} already pushed — marking id=${clientId} as pushed to stop retrying`);
+        return;
+      }
+    }
+
+    console.log(`🚀 Attempting Tally push for client #${clientId} (${client.companyName})...`);
+    const result = await pushToTally(client);
+    if (result.success) {
+      await db.query("UPDATE clients SET tally_pushed = 1 WHERE id = ?", [clientId]);
+      console.log(`✅ Auto-pushed client #${clientId} (${client.companyName}) to Tally`);
+    } else {
+      // ✅ FIXED: After failed push, mark as pushed to stop infinite retry loop
+      await db.query("UPDATE clients SET tally_pushed = 1 WHERE id = ?", [clientId]);
+      console.warn(`⚠️ Auto-push failed for client #${clientId}: ${result.error}`);
+      console.warn(`⏭️ Marked tally_pushed=1 to prevent infinite retry for client #${clientId}`);
     }
   } catch (err) {
     console.error(`❌ Auto-push error for client #${clientId}:`, err.message);
@@ -83,7 +100,7 @@ export const createClient = async (req, res) => {
         dateOfRevivalCall || null, nameOfExecutive, statusOfCall, eMeet || "No",
         updated || "No", dateOfDataUpdate || null, dataUpdatedBy,
         teamLeader, franchiseeName, dateOfClientAllocation || null, reallocationStatus || "No",
-        billingStatus || "Unbilled", bill_no || null, bill_amount || null, bill_date || null  // ✅ FIXED: "pending" → "Unbilled"
+        billingStatus || "Unbilled", bill_no || null, bill_amount || null, bill_date || null
       ]
     );
 
@@ -140,7 +157,7 @@ export const updateClient = async (req, res) => {
         dateOfRevivalCall || null, nameOfExecutive, statusOfCall, eMeet,
         updated, dateOfDataUpdate || null, dataUpdatedBy,
         teamLeader, franchiseeName, dateOfClientAllocation || null, reallocationStatus,
-        billingStatus || "Unbilled", bill_no || null, bill_amount || null, bill_date || null,  // ✅ FIXED: "pending" → "Unbilled"
+        billingStatus || "Unbilled", bill_no || null, bill_amount || null, bill_date || null,
         id
       ]
     );
